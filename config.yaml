@@ -1,0 +1,25 @@
+version: 1.0
+proxy:
+  debug: false
+  accessLog: false
+  errorLog: false
+manage:
+  listen:
+backends:
+  mainnet-api:
+    keepalive: false
+    hosts:
+    - https://api.zilliqa.com
+    k8s_sd:
+      scheme: http
+      port: 4201
+      labelSelecotr:
+        app: zilliqa
+        type: level2lookup
+servers:
+  zilliqa-rpc:
+    # unix-socket tcp http websocket
+    listen: tcp://0.0.0.0:9090
+    # domains:
+    # - a.b.com
+    routers:

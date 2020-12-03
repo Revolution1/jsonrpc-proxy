@@ -1,0 +1,83 @@
+logLevel: debug
+debug: true
+accessLog: true
+
+manage:
+  listen: http://0.0.0.0:8088
+  path: /manage
+  metricsPath: /metrics
+
+upstreams:
+- https://api.zilliqa.com
+# keepAlive: false
+timeout: 3s
+# cache errors globally, for requests like "unknown method"
+errFor: 1s
+
+#k8s_sd:
+#  scheme: http
+#  port: 4201
+#  namespace: default
+#  labelSelector:
+#    app: zilliqa
+#    type: level2lookup
+
+# scheme=http ip=0.0.0.0 port=8080
+listen: 0.0.0.0:8080
+path: /
+
+cacheConfigs:
+# changing fast and no param
+- methods:
+  - GetBlockchainInfo
+  - GetCurrentDSEpoch
+  - GetCurrentMiniEpoch
+  - GetDSBlockRate
+  - GetLatestDsBlock
+  - GetLatestTxBlock
+  - GetNumDSBlocks
+  - GetNumTransactions
+  - GetNumTxBlocks
+  - GetPrevDifficulty
+  - GetPrevDSDifficulty
+  - GetTotalCoinSupply
+  - GetTransactionRate
+  - GetTxBlockRate
+  - GetMinimumGasPrice
+  - GetNumTxnsDSEpoch
+  - GetNumTxnsTxEpoch
+  - GetPendingTxn
+  - GetPendingTxns
+  - GetRecentTransactions
+  for: 5s
+  errFor: 1s
+
+# fast changing and with param
+- methods:
+  - DSBlockListing
+  - TxBlockListing
+  - GetDsBlock
+  - GetTxBlock
+  - GetTransaction
+  - GetTransactionsForTxBlock
+  - GetTxnBodiesForTxBlock
+  - GetSmartContractInit
+  - GetSmartContracts
+  - GetSmartContractState
+  - GetSmartContractSubState
+  - GetBalance
+  for: 5s
+  errFor: 1s
+
+# long term with param
+- methods:
+  - GetContractAddressFromTransactionID
+  - GetSmartContractCode
+  for: 1h
+  errFor: 1s
+
+# Permanent
+- methods:
+  - GetNetworkId
+  for: 1h
+  errFor: 1s
