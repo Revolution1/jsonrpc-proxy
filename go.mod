@@ -3,9 +3,9 @@ module github.com/revolution1/jsonrpc-proxy
 go 1.15
 
 require (
+	github.com/AdhityaRamadhanus/fasthttpcors v0.0.0-20170121111917-d4c07198763a
 	github.com/Ferluci/fast-realip v1.0.0
 	github.com/allegro/bigcache v1.2.1
-	github.com/carousell/fasthttp-prometheus-middleware v1.0.3
 	github.com/fasthttp/router v1.3.3
 	github.com/ghodss/yaml v1.0.0
 	github.com/google/gops v0.3.13
@@ -17,7 +17,7 @@ require (
 	github.com/spf13/cobra v1.1.1
 	github.com/stretchr/testify v1.6.1
 	github.com/valyala/fasthttp v1.17.0
+	go.uber.org/multierr v1.6.0
 	golang.org/x/sys v0.0.0-20201116194326-cc9327a14d48 // indirect
 	sigs.k8s.io/yaml v1.2.0
-//gopkg.in/yaml.v2 v2.4.0 // indirect
 )

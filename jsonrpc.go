@@ -11,6 +11,8 @@ import (
 //var RawVer = []byte(`"2.0"`)
 const JSONRPC2 = "2.0"
 
+var jsonSorted = jsoniter.Config{SortMapKeys: true, EscapeHTML: true}.Froze()
+
 //type JsonRpcVersion string
 //
 //func (j JsonRpcVersion) MarshalJSON() ([]byte, error) {
@@ -48,7 +50,7 @@ func (r RpcRequest) Validate() bool {
 }
 
 func (r RpcRequest) ToCacheKey() (string, error) {
-	params, err := jsoniter.MarshalToString(r.Params)
+	params, err := jsonSorted.MarshalToString(r.Params)
 	if err != nil {
 		return "", err
 	}
@@ -57,9 +59,8 @@ func (r RpcRequest) ToCacheKey() (string, error) {
 
 type RpcResponse struct {
 	rpcHeader
-	Method string      `json:"method"`
-	Error  *RpcError   `json:"error"`
-	Result interface{} `json:"result"`
+	Error  *RpcError   `json:"error,omitempty"`
+	Result interface{} `json:"result,omitempty"`
 }
 
 func (r RpcResponse) Success() bool {

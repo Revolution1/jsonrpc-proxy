@@ -9,6 +9,7 @@ import (
 // since prometheus/client_golang use net/http we need this net/http adapter for fasthttp
 var PrometheusHandler = fasthttpadaptor.NewFastHTTPHandler(promhttp.Handler())
 
+// TODO: ref https://github.com/caddyserver/caddy/blob/master/modules/caddyhttp/metrics.go
 var (
 	ReqDur = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
@@ -22,6 +23,13 @@ var (
 	ReqCnt = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "rpc_requests_total",
+			Help: "Total number of rpc requests by HTTP status code.",
+		},
+		[]string{"code", "path", "method"},
+	)
+	HttpReqCnt = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "http_requests_total",
 			Help: "Total number of rpc requests by HTTP status code.",
 		},
 		[]string{"code", "path", "method"},
@@ -57,5 +65,5 @@ var (
 //}
 
 func init() {
-	prometheus.MustRegister(ReqDur, ReqCnt, SentBytes, RecvBytes)
+	prometheus.MustRegister(ReqDur, ReqCnt, HttpReqCnt, SentBytes, RecvBytes)
 }

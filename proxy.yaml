@@ -1,6 +1,9 @@
 logLevel: debug
-debug: true
-accessLog: true
+debug: false
+accessLog: false
+readTimeout: 15s
+writeTimeout: 15s
+idleTimeout: 15s
 
 manage:
   listen: http://0.0.0.0:8088
@@ -10,7 +13,7 @@ manage:
 upstreams:
 - https://api.zilliqa.com
 # keepAlive: false
-timeout: 3s
+upstreamRequestTimeout: 10s
 # cache errors globally, for requests like "unknown method"
 errFor: 1s
 

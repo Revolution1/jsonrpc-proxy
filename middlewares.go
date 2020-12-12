@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"fmt"
+	"github.com/AdhityaRamadhanus/fasthttpcors"
 	realip "github.com/Ferluci/fast-realip"
 	"github.com/savsgio/gotils"
 	log "github.com/sirupsen/logrus"
@@ -22,6 +24,7 @@ func useMiddleWares(handler fasthttp.RequestHandler, middleware ...MiddleWare) f
 }
 
 func accessLogMetricHandler(prefix string, config *Config) MiddleWare {
+	// TODO: from-cache, is-batch
 	return func(h fasthttp.RequestHandler) fasthttp.RequestHandler {
 		return func(ctx *fasthttp.RequestCtx) {
 			start := time.Now()
@@ -38,9 +41,9 @@ func accessLogMetricHandler(prefix string, config *Config) MiddleWare {
 				reqSize = len(ctx.Request.Header.RawHeaders()) + len(ctx.Request.Body()) + 4
 			}
 			if ctx.Response.IsBodyStream() {
-				reqSize = ctx.Response.Header.Len() + ctx.Response.Header.ContentLength() + 4
+				resSize = ctx.Response.Header.Len() + ctx.Response.Header.ContentLength() + 4
 			} else {
-				reqSize = ctx.Response.Header.Len() + len(ctx.Response.Body()) + 4
+				resSize = ctx.Response.Header.Len() + len(ctx.Response.Body()) + 4
 			}
 			isRpcReq, _ := ctx.UserValue("isRpcReq").(bool)
 			// TODO: method metrics
@@ -53,6 +56,9 @@ func accessLogMetricHandler(prefix string, config *Config) MiddleWare {
 			}
 			if isRpcReq {
 				errStr := "OK"
+				if status != 200 {
+					errStr = fmt.Sprintf("%d(%s)", status, fasthttp.StatusMessage(status))
+				}
 				if err, ok := ctx.UserValue("rpcErr").(*RpcError); ok {
 					errStr = err.AccessLogError()
 					//code = err.Code
@@ -121,3 +127,5 @@ type LeveledLogger struct {
 func (l LeveledLogger) Printf(format string, args ...interface{}) {
 	log.StandardLogger().Logf(l.level, format, args...)
 }
+
+var Cors = fasthttpcors.DefaultHandler().CorsMiddleware

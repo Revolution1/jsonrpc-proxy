@@ -39,12 +39,13 @@ func main() {
 		}
 		config.MustValidate()
 		initLog(config)
-		return runProxyServer(config)
+		return runMain(config)
 	}
 	_ = rootCmd.Execute()
 }
 
-func runProxyServer(config *Config) error {
+func runMain(config *Config) error {
+	CheckFdLimit()
 	log.Infof("Build: %s %s %s, PID: %d", runtime.GOOS, runtime.Compiler, runtime.Version(), os.Getpid())
 	r := router.New()
 	//if debugMode {
@@ -65,11 +66,11 @@ func runProxyServer(config *Config) error {
 	} else {
 		r := router.New()
 		m.registerHandler(r)
-		h := useMiddleWares(r.Handler, panicHandler, fasthttp.CompressHandler, accessLogMetricHandler("[Manage] ", config))
-		manageServer = newServer("JSON-RPC Proxy Manage Server", h, log.TraceLevel)
+		h := useMiddleWares(r.Handler, panicHandler, Cors, fasthttp.CompressHandler, accessLogMetricHandler("[Manage] ", config))
+		manageServer = newServer("JSON-RPC Proxy Manage Server", h, log.TraceLevel, config)
 	}
-	h := useMiddleWares(r.Handler, panicHandler, fasthttp.CompressHandler, accessLogMetricHandler("", config))
-	server := newServer("JSON-RPC Proxy Server", h, log.TraceLevel)
+	h := useMiddleWares(r.Handler, panicHandler, Cors, fasthttp.CompressHandler, accessLogMetricHandler("", config))
+	server := newServer("JSON-RPC Proxy Server", h, log.TraceLevel, config)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := &sync.WaitGroup{}
@@ -114,13 +115,17 @@ func initLog(config *Config) {
 	log.Debugf("LogLevel: %s", log.GetLevel())
 }
 
-func newServer(name string, h fasthttp.RequestHandler, level log.Level) *fasthttp.Server {
+func newServer(name string, h fasthttp.RequestHandler, level log.Level, config *Config) *fasthttp.Server {
 	return &fasthttp.Server{
 		Name:              name,
 		Handler:           h,
 		ErrorHandler:      nil,
 		HeaderReceived:    nil,
 		ContinueHandler:   nil,
+		TCPKeepalive:      true,
+		ReadTimeout:       config.ReadTimeout.Duration,
+		WriteTimeout:      config.WriteTimeout.Duration,
+		IdleTimeout:       config.IdleTimeout.Duration,
 		Concurrency:       0,
 		DisableKeepalive:  false,
 		ReduceMemoryUsage: false,

@@ -1,8 +1,10 @@
 package main
 
 import (
+	log "github.com/sirupsen/logrus"
 	"net/url"
 	"strings"
+	"syscall"
 )
 
 type fnv64a struct{}
@@ -34,4 +36,15 @@ func GetHostFromUrl(u string) string {
 		return ""
 	}
 	return p.Host
+}
+
+func CheckFdLimit() {
+	const min = 8192
+	// Warn if ulimit is too low for production sites
+	rlimit := &syscall.Rlimit{}
+	err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, rlimit)
+	if err == nil && rlimit.Cur < min {
+		log.Warnf("WARNING: File descriptor limit %d is too low for production servers. "+
+			"At least %d is recommended. Fix with `ulimit -n %d`.\n", rlimit.Cur, min, min)
+	}
 }

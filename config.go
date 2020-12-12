@@ -12,17 +12,20 @@ import (
 )
 
 type Config struct {
-	LogLevel     string        `json:"logLevel"`
-	Debug        bool          `json:"debug"`
-	AccessLog    bool          `json:"accessLog"`
-	Manage       ManageConfig  `json:"manage"`
-	Upstreams    []string      `json:"upstreams"`
-	Listen       string        `json:"listen"`
-	Path         string        `json:"path"`
-	KeepAlive    string        `json:"keepAlive"`
-	Timeout      Duration      `json:"timeout"`
-	ErrFor       Duration      `json:"errFor"`
-	CacheConfigs []CacheConfig `json:"cacheConfigs"`
+	LogLevel               string       `json:"logLevel"`
+	Debug                  bool         `json:"debug"`
+	AccessLog              bool         `json:"accessLog"`
+	Manage                 ManageConfig `json:"manage"`
+	Upstreams              []string     `json:"upstreams"`
+	Listen                 string        `json:"listen"`
+	Path                   string        `json:"path"`
+	KeepAlive              string        `json:"keepAlive"`
+	UpstreamRequestTimeout Duration      `json:"upstreamRequestTimeout"`
+	ReadTimeout            Duration      `json:"readTimeout"`
+	WriteTimeout           Duration      `json:"writeTimeout"`
+	IdleTimeout            Duration      `json:"idleTimeout"`
+	ErrFor                 Duration      `json:"errFor"`
+	CacheConfigs           []CacheConfig `json:"cacheConfigs"`
 }
 
 type ManageConfig struct {
