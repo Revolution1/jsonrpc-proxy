@@ -4,9 +4,9 @@ debug: false
 accessLog: true
 
 # client request timeouts
-readTimeout: 15s
-writeTimeout: 15s
-idleTimeout: 15s
+readTimeout: 10s
+writeTimeout: 10s
+idleTimeout: 10s
 
 manage:
   listen: http://0.0.0.0:8088

@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
+	"github.com/certifi/gocertifi"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/valyala/fasthttp"
@@ -13,7 +15,7 @@ import (
 	"time"
 )
 
-var defaultFastStdHttpClient = &FastStdHttpClient{Client: &http.Client{}}
+var defaultFastStdHttpClient = &FastStdHttpClient{}
 
 type FastStdHttpClient struct {
 	*http.Client
@@ -23,7 +25,7 @@ type FastStdHttpClient struct {
 var ErrUpstreamTimeout = errors.New("upstream request timeout")
 
 func (f *FastStdHttpClient) DoDeadline(fastReq *fasthttp.Request, fastResp *fasthttp.Response, deadline time.Time) error {
-	f.once.Do(f.init)
+	f.init()
 	ctx, cancel := context.WithDeadline(context.Background(), deadline)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, string(fastReq.Header.Method()), fastReq.URI().String(), bytes.NewReader(fastReq.Body()))
@@ -58,18 +60,30 @@ func (f *FastStdHttpClient) DoDeadline(fastReq *fasthttp.Request, fastResp *fast
 	if err != nil {
 		log.Debug(string(body))
 	}
-	if len(encodings) == 0 && !isASCII(body){
+	if len(encodings) == 0 && !isASCII(body) {
 		log.Info(encodings)
 	}
 	fastResp.SetBodyRaw(body)
 	return nil
 }
 
-//init disable redirect following for net/http.Client cause it cannot follow POST request
+//init initialize client settings
 func (f *FastStdHttpClient) init() {
-	if f.CheckRedirect == nil {
-		f.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
+	f.once.Do(func() {
+		// init client
+		certPool, err := gocertifi.CACerts()
+		if err != nil {
+			panic(err)
 		}
-	}
+		transport := http.DefaultTransport.(*http.Transport).Clone()
+		transport.TLSClientConfig = &tls.Config{RootCAs: certPool}
+		f.Client = &http.Client{Transport: transport}
+
+		// disable redirect following for net/http.Client cause it cannot follow POST request
+		if f.CheckRedirect == nil {
+			f.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			}
+		}
+	})
 }

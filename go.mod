@@ -7,6 +7,7 @@ require (
 	github.com/Ferluci/fast-realip v1.0.0
 	github.com/allegro/bigcache v1.2.1
 	github.com/andybalholm/brotli v1.0.1 // indirect
+	github.com/certifi/gocertifi v0.0.0-20200922220541-2c3bb06c6054
 	github.com/fasthttp/router v1.3.3
 	github.com/ghodss/yaml v1.0.0
 	github.com/google/gops v0.3.14

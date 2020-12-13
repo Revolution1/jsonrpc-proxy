@@ -36,6 +36,8 @@ info:
 	@echo 'Branch:  ' ${BRANCH}
 	@echo 'Commit:  ' ${COMMIT}
 	@echo 'Dist Dir:' ${DIST}
+	@echo 'Tag  :   ' ${TAG}
+	@echo 'Image:   ' ${IMAGE}
 	@echo
 	@echo 'Use "make release" to build release binaries'
 	@echo 'Use "make local" to build binary for local environment'
