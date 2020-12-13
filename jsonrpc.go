@@ -49,6 +49,10 @@ func (r RpcRequest) Validate() bool {
 	return r.rpcHeader.Validate() && r.Method != ""
 }
 
+func (r RpcRequest) String() string {
+	return fmt.Sprintf("%s(%s)", r.Method, r.Params)
+}
+
 func (r RpcRequest) ToCacheKey() (string, error) {
 	params, err := jsonSorted.MarshalToString(r.Params)
 	if err != nil {

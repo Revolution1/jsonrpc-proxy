@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strings"
 	"syscall"
+	"unicode"
 )
 
 type fnv64a struct{}
@@ -47,4 +48,13 @@ func CheckFdLimit() {
 		log.Warnf("WARNING: File descriptor limit %d is too low for production servers. "+
 			"At least %d is recommended. Fix with `ulimit -n %d`.\n", rlimit.Cur, min, min)
 	}
+}
+
+func isASCII(s []byte) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] > unicode.MaxASCII {
+			return false
+		}
+	}
+	return true
 }

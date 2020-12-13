@@ -11,7 +11,7 @@ manage:
   metricsPath: /metrics
 
 upstreams:
-- https://api.zilliqa.com
+- https://dev-api.zilliqa.com
 # keepAlive: false
 upstreamRequestTimeout: 10s
 # cache errors globally, for requests like "unknown method"

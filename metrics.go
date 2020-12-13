@@ -26,7 +26,7 @@ var (
 		prometheus.CounterOpts{
 			Namespace: MetricsNs,
 			Name:      "requests_total",
-			Help:      "Total number of rpc requests by HTTP status code.",
+			Help:      "Total number of rpc requests.",
 		},
 		[]string{"code", "path", "method", "rpc_method"},
 	)

@@ -2,7 +2,6 @@ package main
 
 import (
 	"github.com/savsgio/gotils/nocopy"
-	log "github.com/sirupsen/logrus"
 	"github.com/valyala/fasthttp"
 	"net/url"
 	"sync"
@@ -95,13 +94,13 @@ const DefaultLBClientTimeout = time.Second
 
 // DoDeadline calls DoDeadline on the least loaded client
 func (um *UpstreamManager) DoDeadline(req *fasthttp.Request, resp *fasthttp.Response, deadline time.Time) error {
-	return retry(func() error { return um.get().DoDeadline(req, resp, deadline) }, um.maxAttempts)
+	return retry(req, resp, deadline, um.get().DoDeadline, um.maxAttempts)
 }
 
 // DoTimeout calculates deadline and calls DoDeadline on the least loaded client
 func (um *UpstreamManager) DoTimeout(req *fasthttp.Request, resp *fasthttp.Response, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
-	return retry(func() error { return um.get().DoDeadline(req, resp, deadline) }, um.maxAttempts)
+	return retry(req, resp, deadline, um.get().DoDeadline, um.maxAttempts)
 }
 
 func (um *UpstreamManager) setMaxAttempts() {
@@ -111,12 +110,16 @@ func (um *UpstreamManager) setMaxAttempts() {
 	um.maxAttempts = um.MaxAttempts
 }
 
-func retry(f func() error, max int) (err error) {
+func retry(req *fasthttp.Request, resp *fasthttp.Response, deadline time.Time, f func(req *fasthttp.Request, resp *fasthttp.Response, deadline time.Time) error, max int) (err error) {
 	if max <= 1 {
-		return f()
+		return f(req, resp, deadline)
 	}
 	for a := 0; a < max; a++ {
-		err = f()
+		resp.Reset()
+		err = f(req, resp, deadline)
+		if err == nil && resp.StatusCode() == fasthttp.StatusOK && len(resp.Body()) == 0 {
+			continue
+		}
 		if err == nil {
 			return
 		}
@@ -230,7 +233,6 @@ func (u *upstream) DoDeadline(_req *fasthttp.Request, resp *fasthttp.Response, d
 	r := fasthttp.AcquireRequest()
 	_req.CopyTo(r)
 	u.replaceReqHeaders(r)
-	log.Tracef("requesting to upstream: %s\n%s", r.URI(), r.String())
 	redirectsCount := 0
 	var statusCode int
 	var redirectURL string

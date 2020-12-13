@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"github.com/valyala/fasthttp"
 	"io/ioutil"
 	"net/http"
@@ -31,6 +33,9 @@ func (f *FastStdHttpClient) DoDeadline(fastReq *fasthttp.Request, fastResp *fast
 	fastReq.Header.VisitAll(func(key, value []byte) {
 		req.Header.Set(string(key), string(value))
 	})
+	if log.IsLevelEnabled(log.TraceLevel) {
+		log.Tracef("requesting to upstream: %s\n%s\n", req.RequestURI, fastReq.String())
+	}
 	resp, err := f.Do(req)
 	if err != nil {
 		if ctx.Err() != nil {
@@ -47,7 +52,16 @@ func (f *FastStdHttpClient) DoDeadline(fastReq *fasthttp.Request, fastResp *fast
 	if err != nil {
 		return err
 	}
-	fastResp.SetBody(body)
+	encodings := resp.Header.Values(fasthttp.HeaderContentEncoding)
+	var d interface{}
+	err = json.Unmarshal(body, &d)
+	if err != nil {
+		log.Debug(string(body))
+	}
+	if len(encodings) == 0 && !isASCII(body){
+		log.Info(encodings)
+	}
+	fastResp.SetBodyRaw(body)
 	return nil
 }
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/AdhityaRamadhanus/fasthttpcors"
 	realip "github.com/Ferluci/fast-realip"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/savsgio/gotils"
 	log "github.com/sirupsen/logrus"
 	"github.com/valyala/fasthttp"
@@ -31,6 +32,8 @@ func accessLogMetricHandler(prefix string, config *Config) MiddleWare {
 			h(ctx)
 			duration := time.Since(start)
 			status := ctx.Response.StatusCode()
+			method := string(ctx.Method())
+			rpcErrCode := 0
 			path := gotils.B2S(ctx.URI().Path())
 
 			var reqSize, resSize int
@@ -45,7 +48,7 @@ func accessLogMetricHandler(prefix string, config *Config) MiddleWare {
 				resSize = ctx.Response.Header.Len() + len(ctx.Response.Body()) + 4
 			}
 			isRpcReq, _ := ctx.UserValue("isRpcReq").(bool)
-			var methods []string
+			var rpcMethods []string
 			if isRpcReq {
 				errStr := "OK"
 				if status != 200 {
@@ -53,13 +56,13 @@ func accessLogMetricHandler(prefix string, config *Config) MiddleWare {
 				}
 				if err, ok := ctx.UserValue("rpcErr").(*RpcError); ok {
 					errStr = err.AccessLogError()
-					//code = err.Code
+					rpcErrCode = err.Code
 				} else if err, ok := ctx.UserValue("rpcErr").(error); ok {
 					errStr = err.Error()
 				}
 				methodsStr := ""
-				if methods = getCtxRpcMethods(ctx); methods != nil {
-					methodsStr = strings.Join(methods, ",")
+				if rpcMethods = getCtxRpcMethods(ctx); rpcMethods != nil {
+					methodsStr = strings.Join(rpcMethods, ",")
 				}
 				if config.AccessLog {
 					log.Infof(
@@ -77,7 +80,11 @@ func accessLogMetricHandler(prefix string, config *Config) MiddleWare {
 				}
 			} else {
 				if config.AccessLog {
-					log.Infof(
+					fun := log.Infof
+					if bytes.HasPrefix(ctx.UserAgent(), []byte("ELB-HealthChecker")) {
+						fun = log.Tracef
+					}
+					fun(
 						`%s%s - %s - "%s %s" %d %d %d "%s" %s`+"\n",
 						prefix,
 						bytes.ToUpper(ctx.URI().Scheme()),
@@ -92,15 +99,28 @@ func accessLogMetricHandler(prefix string, config *Config) MiddleWare {
 					)
 				}
 			}
-			// TODO: method metrics
-			if status != fasthttp.StatusNotFound && path != config.Manage.MetricsPath {
+			if status != fasthttp.StatusNotFound &&
+				path != config.Manage.MetricsPath &&
+				!bytes.Equal(ctx.Method(), []byte(fasthttp.MethodOptions)) {
 				RecvBytes.Add(float64(reqSize))
 				SentBytes.Add(float64(resSize))
-				method := ""
-				if len(methods) > 0 {
-					method = methods[0]
+				if isRpcReq {
+					for _, m := range rpcMethods {
+						ReqDuration.With(prometheus.Labels{
+							"code":       strconv.Itoa(rpcErrCode),
+							"path":       path,
+							"method":     method,
+							"rpc_method": m,
+						}).Observe(float64(duration) / float64(time.Second))
+					}
+				} else {
+					ReqDuration.With(prometheus.Labels{
+						"code":       strconv.Itoa(status),
+						"path":       path,
+						"method":     method,
+						"rpc_method": "",
+					}).Observe(float64(duration) / float64(time.Second))
 				}
-				ReqDuration.WithLabelValues(strconv.Itoa(ctx.Response.StatusCode()), path, gotils.B2S(ctx.Method()), method).Observe(float64(duration) / float64(time.Second))
 			}
 		}
 	}
@@ -130,4 +150,13 @@ func (l LeveledLogger) Printf(format string, args ...interface{}) {
 	log.StandardLogger().Logf(l.level, format, args...)
 }
 
-var Cors = fasthttpcors.DefaultHandler().CorsMiddleware
+var Cors MiddleWare
+
+func init() {
+	corsHandler := fasthttpcors.NewCorsHandler(fasthttpcors.Options{
+		AllowedOrigins: []string{"*"},
+		AllowedHeaders: []string{"*"},
+		AllowedMethods: []string{"GET", "POST"},
+	})
+	Cors = corsHandler.CorsMiddleware
+}

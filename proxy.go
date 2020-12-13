@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"github.com/fasthttp/router"
 	jsoniter "github.com/json-iterator/go"
@@ -88,23 +89,25 @@ func (p *Proxy) Serve() error {
 
 func (p *Proxy) requestHandler(ctx *fasthttp.RequestCtx) {
 	ctx.SetUserValue("isRpcReq", true)
-	body := bytes.TrimSpace(ctx.Request.Body())
+	reqBody := bytes.TrimSpace(ctx.Request.Body())
 	// length of minimum valid request '{"jsonrpc":"2.0","method":"1","id":1}'
-	if len(body) < 37 {
+	if len(reqBody) < 37 {
 		setRpcErr(ctx, ErrRpcParseError, nil)
 		return
 	}
-	reqs, err := ParseRequest(body)
+	reqs, err := ParseRequest(reqBody)
 	if err != nil {
 		setRpcErr(ctx, err, nil)
 		return
 	}
 	setCtxRpcMethods(ctx, reqs)
+	//var isMonoReq bool
 	switch len(reqs) {
 	case 0:
 		setRpcErr(ctx, ErrRpcInvalidRequest, nil)
 		return
 	case 1:
+		//isMonoReq = true
 		req := reqs[0]
 		if !req.Validate() {
 			setRpcErr(ctx, ErrRpcInvalidRequest, req.Id)
@@ -143,9 +146,11 @@ func (p *Proxy) requestHandler(ctx *fasthttp.RequestCtx) {
 		RpcCacheMiss.WithLabelValues(req.Method).Inc()
 		resp := fasthttp.AcquireResponse()
 		defer fasthttp.ReleaseResponse(resp)
+		setAcceptEncoding(ctx)
 		err := p.um.DoTimeout(&ctx.Request, resp, p.config.UpstreamRequestTimeout.Duration)
 		if err != nil {
-			log.WithError(err).WithField("req", &ctx.Request).Trace("error while requesting from upstream")
+			log.WithError(err).WithField("req", req).Warn("error while requesting from upstream")
+			log.WithError(err).WithField("req", &ctx.Request).Debug("error while requesting from upstream")
 			e := ErrWithData(ErrRpcInternalError, err.Error())
 			p.SetCachedError(&req, e, errFor)
 			setRpcErr(ctx, e, req.Id)
@@ -154,8 +159,9 @@ func (p *Proxy) requestHandler(ctx *fasthttp.RequestCtx) {
 		respBody, err := getResponseBody(resp)
 		rpcResp := &RpcResponse{}
 		if resp.StatusCode() < 200 || resp.StatusCode() >= 400 || err != nil {
-			log.WithError(err).Error("fail to decode response, simply forward to client")
-			log.Tracef("response: \n%s", resp.String())
+			log.WithError(err).WithField("req", req).Warn("fail to decode response, simply forward to client")
+			log.Debug("decode error: ", err.Error())
+			log.Debug("request:\n%s\n\nresponse:\n%s", &ctx.Request, resp)
 			p.SetCachedResponse(req, resp, errFor)
 			//resp.CopyTo(&ctx.Response)
 			p.forwardResponse(ctx, resp)
@@ -163,8 +169,12 @@ func (p *Proxy) requestHandler(ctx *fasthttp.RequestCtx) {
 		}
 		err = jsoniter.Unmarshal(respBody, rpcResp)
 		if err != nil {
-			log.WithError(err).Error("fail to decode response to json, simply forward to client")
-			log.Tracef("response: \n%s", resp.String())
+			err = json.Unmarshal(respBody, rpcResp)
+		}
+		if err != nil {
+			log.WithError(err).WithField("req", req).WithField("res", string(respBody)).Warn("fail to decode response to json, simply forward to client")
+			log.Debug("unmarshal error: ", err.Error())
+			log.Tracef("response: \n%s", resp)
 			p.SetCachedResponse(req, resp, errFor)
 			//resp.CopyTo(&ctx.Response)
 			p.forwardResponse(ctx, resp)
@@ -172,7 +182,7 @@ func (p *Proxy) requestHandler(ctx *fasthttp.RequestCtx) {
 		}
 		fasthttp.ReleaseResponse(resp)
 		if rpcResp.Error != nil {
-			log.WithField("rpcErr", rpcResp.Error).WithField("req", &ctx.Request).Trace("rpc error while requesting from upstream")
+			log.WithField("rpcErr", rpcResp.Error).Tracef("rpc error while requesting from upstream: \n%s\n", ctx.Request.Body())
 			p.SetCachedError(&req, rpcResp.Error, errFor)
 			setRpcErr(ctx, rpcResp.Error, req.Id)
 			return
@@ -259,25 +269,6 @@ func (p *Proxy) GetCachedItem(req *RpcRequest, cc *CacheConfig) *CachedItem {
 	return p.CacheManager.GetItem(key, dur)
 }
 
-//func (p *Proxy) GetCachedValues(reqs []RpcRequest) []byte {
-//	resps := make([]jsoniter.RawMessage, len(reqs))
-//	for _, req := range reqs {
-//		r := p.GetCachedValue(&req, nil)
-//		if r == nil {
-//			return nil
-//		}
-//		resps = append(resps, r)
-//	}
-//	if len(resps) > 0 {
-//		ret, err := jsoniter.Marshal(resps)
-//		if err != nil {
-//			log.WithError(err).Error("error while marshaling responses from cache")
-//		}
-//		return ret
-//	}
-//	return nil
-//}
-
 func (p *Proxy) simpleForward(ctx *fasthttp.RequestCtx) {
 	err := p.um.DoTimeout(&ctx.Request, &ctx.Response, p.config.UpstreamRequestTimeout.Duration)
 	log.WithError(err).Debug("direct pass")
@@ -288,7 +279,7 @@ func (p *Proxy) forwardResponse(ctx *fasthttp.RequestCtx, response *fasthttp.Res
 	r.SetStatusCode(response.StatusCode())
 	r.Header.SetContentType(gotils.B2S(response.Header.ContentType()))
 	r.Header.SetBytesV(fasthttp.HeaderContentEncoding, response.Header.Peek(fasthttp.HeaderContentEncoding))
-	_, _ = response.WriteTo(ctx)
+	_ = response.BodyWriteTo(ctx)
 }
 
 func setRpcErr(ctx *fasthttp.RequestCtx, rpcError *RpcError, id interface{}) {
@@ -329,25 +320,38 @@ func writeJsonResp(ctx *fasthttp.RequestCtx, body []byte) {
 	ctx.SetStatusCode(fasthttp.StatusOK)
 }
 
-var (
-	strGzip    = []byte("gzip")
-	strBr      = []byte("br")
-	strDeflate = []byte("deflate")
+const (
+	strGzip    = "gzip"
+	strBr      = "br"
+	strDeflate = "deflate"
 )
 
 var ErrUnknownContentEncoding = errors.New("Unknown Content Encoding")
 
 func getResponseBody(resp *fasthttp.Response) ([]byte, error) {
-	encoding := resp.Header.Peek(fasthttp.HeaderContentEncoding)
-	switch {
-	case encoding == nil:
-		return resp.Body(), nil
-	case bytes.Equal(encoding, strGzip):
+	encoding := string(bytes.TrimSpace(resp.Header.Peek(fasthttp.HeaderContentEncoding)))
+	switch encoding {
+	case strGzip:
 		return resp.BodyGunzip()
-	case bytes.Equal(encoding, strBr):
+	case strBr:
 		return resp.BodyUnbrotli()
-	case bytes.Equal(encoding, strDeflate):
+	case strDeflate:
 		return resp.BodyInflate()
+	default:
+		body := resp.Body()
+		//if !isASCII(body) {
+		//	// give it a try
+		//	b, err := resp.BodyGunzip()
+		//	if err != nil {
+		//		return body, nil
+		//	}
+		//	return b, nil
+		//}
+		return body, nil
 	}
-	return nil, ErrUnknownContentEncoding
+	//return resp.Body(), errors.Wrapf(ErrUnknownContentEncoding, "encoding: '%s'", encoding)
+}
+
+func setAcceptEncoding(ctx *fasthttp.RequestCtx) {
+	ctx.Request.Header.Del(fasthttp.HeaderAcceptEncoding)
 }
