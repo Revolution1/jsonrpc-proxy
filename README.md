@@ -1,4 +1,4 @@
-# jsonrpc-proxy ![Build And Release](https://github.com/Revolution1/jsonrpc-proxy/workflows/Build%20and%20Release/badge.svg)
+# jsonrpc-proxy ![Build and Release](https://github.com/Revolution1/jsonrpc-proxy/workflows/Build%20and%20Release/badge.svg)
 
 ## Request Processing & Caching Policy
 

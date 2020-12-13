@@ -8,11 +8,12 @@ BUILD_INFO=$(shell go version)
 DIST="./dist"
 BIN_NAME="jsonrpc-proxy"
 MODULE_NAME="github.com/revolution1/jsonrpc-proxy"
+IMAGE_REGISTRY="ghcr.io/"
 
 ifdef TAG
-	IMAGE="revolution1/jsonrpc-proxy:${TAG}"
+	IMAGE="${IMAGE_REGISTRY}revolution1/jsonrpc-proxy:${TAG}"
 else
-	IMAGE="revolution1/jsonrpc-proxy:${VERSION}-${COMMIT}"
+	IMAGE="${IMAGE_REGISTRY}revolution1/jsonrpc-proxy:${VERSION}-${COMMIT}"
 endif
 
 BUILD_FLAGS=-v -ldflags '-s -w \
@@ -71,3 +72,6 @@ tag-release:
 image:
 	#docker build -t ${IMAGE} . ${DOCKER_BUILD_ARG}
 	docker build -t ${IMAGE} .
+
+push-image:
+	docker push ${IMAGE}
