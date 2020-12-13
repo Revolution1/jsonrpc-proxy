@@ -91,23 +91,23 @@ func (p *Proxy) requestHandler(ctx *fasthttp.RequestCtx) {
 	body := bytes.TrimSpace(ctx.Request.Body())
 	// length of minimum valid request '{"jsonrpc":"2.0","method":"1","id":1}'
 	if len(body) < 37 {
-		setRpcErr(ctx, ErrRpcParseError)
+		setRpcErr(ctx, ErrRpcParseError, nil)
 		return
 	}
 	reqs, err := ParseRequest(body)
 	if err != nil {
-		setRpcErr(ctx, err)
+		setRpcErr(ctx, err, nil)
 		return
 	}
 	setCtxRpcMethods(ctx, reqs)
 	switch len(reqs) {
 	case 0:
-		setRpcErr(ctx, ErrRpcInvalidRequest)
+		setRpcErr(ctx, ErrRpcInvalidRequest, nil)
 		return
 	case 1:
 		req := reqs[0]
 		if !req.Validate() {
-			setRpcErr(ctx, ErrRpcInvalidRequest)
+			setRpcErr(ctx, ErrRpcInvalidRequest, req.Id)
 			return
 		}
 		// skip cache if is valid req&resp but no cache config set
@@ -121,6 +121,7 @@ func (p *Proxy) requestHandler(ctx *fasthttp.RequestCtx) {
 		res := p.GetCachedItem(&req, cc)
 		// found cached
 		if res != nil {
+			RpcCacheHit.WithLabelValues(req.Method).Inc()
 			switch {
 			case res.IsHttpResponse():
 				res.WriteHttpResponse(&ctx.Response)
@@ -130,12 +131,16 @@ func (p *Proxy) requestHandler(ctx *fasthttp.RequestCtx) {
 				if err != nil {
 					log.WithError(err).Panic("fail to marshal response from cache")
 				}
+				if res.IsRpcError() {
+					setRpcErr(ctx, resp.Error, req.Id)
+				}
 				writeJsonResp(ctx, data)
 			default:
 				log.WithField("res", res).Panic("fail to process item from cache")
 			}
 			return
 		}
+		RpcCacheMiss.WithLabelValues(req.Method).Inc()
 		resp := fasthttp.AcquireResponse()
 		defer fasthttp.ReleaseResponse(resp)
 		err := p.um.DoTimeout(&ctx.Request, resp, p.config.UpstreamRequestTimeout.Duration)
@@ -143,7 +148,7 @@ func (p *Proxy) requestHandler(ctx *fasthttp.RequestCtx) {
 			log.WithError(err).WithField("req", &ctx.Request).Trace("error while requesting from upstream")
 			e := ErrWithData(ErrRpcInternalError, err.Error())
 			p.SetCachedError(&req, e, errFor)
-			setRpcErr(ctx, e)
+			setRpcErr(ctx, e, req.Id)
 			return
 		}
 		respBody, err := getResponseBody(resp)
@@ -169,7 +174,7 @@ func (p *Proxy) requestHandler(ctx *fasthttp.RequestCtx) {
 		if rpcResp.Error != nil {
 			log.WithField("rpcErr", rpcResp.Error).WithField("req", &ctx.Request).Trace("rpc error while requesting from upstream")
 			p.SetCachedError(&req, rpcResp.Error, errFor)
-			setRpcErr(ctx, rpcResp.Error)
+			setRpcErr(ctx, rpcResp.Error, req.Id)
 			return
 		}
 		p.SetCachedRpcResponse(&req, rpcResp, cacheFor)
@@ -237,6 +242,7 @@ func (p *Proxy) SetCachedRpcResponse(req *RpcRequest, resp *RpcResponse, cacheFo
 }
 
 func (p *Proxy) GetCachedItem(req *RpcRequest, cc *CacheConfig) *CachedItem {
+	dur := time.Duration(0)
 	key, err := req.ToCacheKey()
 	if err != nil {
 		log.WithError(err).WithField("req", req).Error("error while request.ToCacheKey()")
@@ -247,9 +253,10 @@ func (p *Proxy) GetCachedItem(req *RpcRequest, cc *CacheConfig) *CachedItem {
 	}
 	if cc == nil {
 		log.WithField("method", req.Method).Trace("Cache config not found for method")
-		return nil
+	} else {
+		dur = cc.For.Duration
 	}
-	return p.CacheManager.GetItem(key, cc.For.Duration)
+	return p.CacheManager.GetItem(key, dur)
 }
 
 //func (p *Proxy) GetCachedValues(reqs []RpcRequest) []byte {
@@ -284,10 +291,10 @@ func (p *Proxy) forwardResponse(ctx *fasthttp.RequestCtx, response *fasthttp.Res
 	_, _ = response.WriteTo(ctx)
 }
 
-func setRpcErr(ctx *fasthttp.RequestCtx, rpcError *RpcError) {
+func setRpcErr(ctx *fasthttp.RequestCtx, rpcError *RpcError, id interface{}) {
 	ctx.ResetBody()
 	ctx.SetUserValue("rpcErr", rpcError)
-	ctx.SetBodyString(rpcError.JsonError())
+	ctx.SetBodyString(rpcError.JsonError(id))
 	ctx.SetStatusCode(200)
 	ctx.SetContentType("application/json; charset=utf-8")
 }
@@ -295,6 +302,12 @@ func setRpcErr(ctx *fasthttp.RequestCtx, rpcError *RpcError) {
 func getCtxRpcErr(ctx *fasthttp.RequestCtx) *RpcError {
 	if e, ok := ctx.UserValue("rpcErr").(*RpcError); ok {
 		return e
+	}
+	return nil
+}
+func getCtxRpcMethods(ctx *fasthttp.RequestCtx) []string {
+	if m, ok := ctx.UserValue("rpcMethods").([]string); ok {
+		return m
 	}
 	return nil
 }

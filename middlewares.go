@@ -32,7 +32,6 @@ func accessLogMetricHandler(prefix string, config *Config) MiddleWare {
 			duration := time.Since(start)
 			status := ctx.Response.StatusCode()
 			path := gotils.B2S(ctx.URI().Path())
-			ep := gotils.B2S(ctx.Method()) + "_" + path
 
 			var reqSize, resSize int
 			if ctx.Request.IsBodyStream() {
@@ -46,14 +45,7 @@ func accessLogMetricHandler(prefix string, config *Config) MiddleWare {
 				resSize = ctx.Response.Header.Len() + len(ctx.Response.Body()) + 4
 			}
 			isRpcReq, _ := ctx.UserValue("isRpcReq").(bool)
-			// TODO: method metrics
-			if status != fasthttp.StatusNotFound && path != config.Manage.MetricsPath {
-				RecvBytes.Add(float64(reqSize))
-				SentBytes.Add(float64(resSize))
-				if isRpcReq {
-					ReqDur.WithLabelValues(strconv.Itoa(ctx.Response.StatusCode()), ep, "").Observe(float64(duration) / float64(time.Second))
-				}
-			}
+			var methods []string
 			if isRpcReq {
 				errStr := "OK"
 				if status != 200 {
@@ -66,7 +58,7 @@ func accessLogMetricHandler(prefix string, config *Config) MiddleWare {
 					errStr = err.Error()
 				}
 				methodsStr := ""
-				if methods, ok := ctx.UserValue("rpcMethods").([]string); ok {
+				if methods = getCtxRpcMethods(ctx); methods != nil {
 					methodsStr = strings.Join(methods, ",")
 				}
 				if config.AccessLog {
@@ -99,6 +91,16 @@ func accessLogMetricHandler(prefix string, config *Config) MiddleWare {
 						duration,
 					)
 				}
+			}
+			// TODO: method metrics
+			if status != fasthttp.StatusNotFound && path != config.Manage.MetricsPath {
+				RecvBytes.Add(float64(reqSize))
+				SentBytes.Add(float64(resSize))
+				method := ""
+				if len(methods) > 0 {
+					method = methods[0]
+				}
+				ReqDuration.WithLabelValues(strconv.Itoa(ctx.Response.StatusCode()), path, gotils.B2S(ctx.Method()), method).Observe(float64(duration) / float64(time.Second))
 			}
 		}
 	}

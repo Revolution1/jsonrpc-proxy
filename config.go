@@ -60,7 +60,7 @@ func LoadConfig(path string) (conf *Config, err error) {
 func (c *Config) Search(method string) *CacheConfig {
 	for _, cc := range c.CacheConfigs {
 		i := sort.SearchStrings(cc.Methods, method)
-		if cc.Methods[i] == method {
+		if i < len(cc.Methods) && cc.Methods[i] == method {
 			return &cc
 		}
 	}

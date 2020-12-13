@@ -25,11 +25,17 @@ func main() {
 		Short: "proxy for jsonrpc service",
 	}
 	flags := rootCmd.Flags()
+	printVer := flags.BoolP("version", "v", false, "print version")
 	path := flags.StringP("config", "c", "proxy.yaml", "the path of config file")
 	_ = rootCmd.MarkFlagFilename("config", "yaml", "yml")
 	//_ = cobra.MarkFlagRequired(flags, "config")
 	//ctx, cancel := context.WithCancel(context.Background())
 	rootCmd.RunE = func(cmd *cobra.Command, args []string) error {
+		if *printVer {
+			printVersion()
+			return nil
+		}
+		// gops agent
 		if err := agent.Listen(agent.Options{}); err != nil {
 			return err
 		}
