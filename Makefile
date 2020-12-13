@@ -8,7 +8,7 @@ BUILD_INFO=$(shell go version)
 DIST="./dist"
 BIN_NAME="jsonrpc-proxy"
 MODULE_NAME="github.com/revolution1/jsonrpc-proxy"
-IMAGE_REGISTRY="ghcr.io/"
+#IMAGE_REGISTRY="ghcr.io/"
 
 ifdef TAG
 	IMAGE="${IMAGE_REGISTRY}revolution1/jsonrpc-proxy:${TAG}"

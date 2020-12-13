@@ -55,9 +55,9 @@ jobs:
         overwrite: true
         file_glob: true
 
-    - name: build and push image
-      run: |
-        # new login with new container registry url and PAT
-        docker login ghcr.io -u $GITHUB_ACTOR -p ${{ secrets.CR_PAT }}
-        # new container registry urls added
-        make image && make push-image
+#    - name: build and push image
+#      run: |
+#        # new login with new container registry url and PAT
+#        docker login ghcr.io -u $GITHUB_ACTOR -p ${{ secrets.CR_PAT }}
+#        # new container registry urls added
+#        make image && make push-image
