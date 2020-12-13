@@ -15,6 +15,21 @@ import (
 	"time"
 )
 
+var WellKnownHealthCheckerUserAgentPrefixes = []string{
+	"ELB-HealthChecker",
+	"kube-probe",
+	"Prometheus",
+}
+
+func guessIsHealthChecker(ua string) bool {
+	for _, p := range WellKnownHealthCheckerUserAgentPrefixes {
+		if strings.HasPrefix(ua, p) {
+			return true
+		}
+	}
+	return false
+}
+
 type MiddleWare func(h fasthttp.RequestHandler) fasthttp.RequestHandler
 
 func useMiddleWares(handler fasthttp.RequestHandler, middleware ...MiddleWare) fasthttp.RequestHandler {
@@ -81,7 +96,7 @@ func accessLogMetricHandler(prefix string, config *Config) MiddleWare {
 			} else {
 				if config.AccessLog {
 					fun := log.Infof
-					if bytes.HasPrefix(ctx.UserAgent(), []byte("ELB-HealthChecker")) {
+					if guessIsHealthChecker(string(ctx.UserAgent())) {
 						fun = log.Tracef
 					}
 					fun(
