@@ -1,6 +1,6 @@
 logLevel: debug
 debug: false
-accessLog: false
+accessLog: true
 readTimeout: 15s
 writeTimeout: 15s
 idleTimeout: 15s
