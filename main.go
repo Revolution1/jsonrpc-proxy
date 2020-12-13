@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"github.com/fasthttp/router"
 	"github.com/google/gops/agent"
 	log "github.com/sirupsen/logrus"
@@ -32,13 +33,15 @@ func main() {
 	//ctx, cancel := context.WithCancel(context.Background())
 	rootCmd.RunE = func(cmd *cobra.Command, args []string) error {
 		if *printVer {
-			printVersion()
+			fmt.Println(printVersion())
 			return nil
 		}
 		// gops agent
 		if err := agent.Listen(agent.Options{}); err != nil {
 			return err
 		}
+		log.Infof("Loading config from %s", *path)
+		log.Infof("Version: %s", printVersion())
 		config, err := LoadConfig(*path)
 		if err != nil {
 			return err

@@ -5,7 +5,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-var version = "0.0.1"
+var version = "0.0.2"
 
 var (
 	commit    = ""
@@ -15,8 +15,8 @@ var (
 	date      = ""
 )
 
-func printVersion() {
-	fmt.Printf("%s (commit='%s', branch='%s', tag='%s', date='%s', build='%s')", version, commit, branch, tag, date, buildInfo)
+func printVersion() string {
+	return fmt.Sprintf("%s (commit='%s', branch='%s', tag='%s', date='%s', build='%s')", version, commit, branch, tag, date, buildInfo)
 }
 
 func init() {
