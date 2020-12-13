@@ -108,6 +108,7 @@ func initLog(config *Config) {
 		FullTimestamp:    true,
 		TimestampFormat:  time.RFC3339,
 		QuoteEmptyFields: true,
+		ForceColors:      config.LogForceColors,
 	})
 	level, err := log.ParseLevel(strings.ToLower(config.LogLevel))
 	if err != nil {

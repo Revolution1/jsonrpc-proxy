@@ -12,11 +12,12 @@ import (
 )
 
 type Config struct {
-	LogLevel               string       `json:"logLevel"`
-	Debug                  bool         `json:"debug"`
-	AccessLog              bool         `json:"accessLog"`
-	Manage                 ManageConfig `json:"manage"`
-	Upstreams              []string     `json:"upstreams"`
+	LogLevel               string        `json:"logLevel"`
+	LogForceColors         bool          `json:"logForceColors"`
+	Debug                  bool          `json:"debug"`
+	AccessLog              bool          `json:"accessLog"`
+	Manage                 ManageConfig  `json:"manage"`
+	Upstreams              []string      `json:"upstreams"`
 	Listen                 string        `json:"listen"`
 	Path                   string        `json:"path"`
 	KeepAlive              string        `json:"keepAlive"`

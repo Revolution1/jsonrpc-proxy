@@ -1,6 +1,9 @@
 logLevel: debug
+logForceColors: true
 debug: false
 accessLog: true
+
+# client request timeouts
 readTimeout: 15s
 writeTimeout: 15s
 idleTimeout: 15s

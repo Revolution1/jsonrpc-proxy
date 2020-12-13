@@ -150,7 +150,7 @@ func (p *Proxy) requestHandler(ctx *fasthttp.RequestCtx) {
 		err := p.um.DoTimeout(&ctx.Request, resp, p.config.UpstreamRequestTimeout.Duration)
 		if err != nil {
 			log.WithError(err).WithField("req", req).Warn("error while requesting from upstream")
-			log.WithError(err).Debugf("error while requesting from upstream: %s", &ctx.Request)
+			log.WithError(err).Tracef("error while requesting from upstream: \n%s", &ctx.Request)
 			e := ErrWithData(ErrRpcInternalError, err.Error())
 			p.SetCachedError(&req, e, errFor)
 			setRpcErr(ctx, e, req.Id)
@@ -161,7 +161,7 @@ func (p *Proxy) requestHandler(ctx *fasthttp.RequestCtx) {
 		if resp.StatusCode() < 200 || resp.StatusCode() >= 400 || err != nil {
 			log.WithError(err).WithField("req", req).Warn("fail to decode response, simply forward to client")
 			log.Debug("decode error: ", err.Error())
-			log.Debug("request:\n%s\n\nresponse:\n%s", &ctx.Request, resp)
+			log.Tracef("request:\n%s\n\nresponse:\n%s", &ctx.Request, resp)
 			p.SetCachedResponse(req, resp, errFor)
 			//resp.CopyTo(&ctx.Response)
 			p.forwardResponse(ctx, resp)
