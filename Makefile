@@ -62,16 +62,16 @@ darwin-amd64:
 	GO111MODULE="on" GOOS=darwin GOARCH=amd64 go build ${BUILD_FLAGS} -o ${DIST}/${BIN_NAME}-Darwin-amd64 ${MODULE_NAME}
 
 
-release: clean linux-amd64 darwin-amd64
-	#rm -f ${DIST}/sha256sums.txt
-	cd ${DIST} && sha256sum ./* > sha256sums.txt
-
-tag-release:
-	git tag v${VERSION}
-
 image:
 	#docker build -t ${IMAGE} . ${DOCKER_BUILD_ARG}
 	docker build -t ${IMAGE} .
 
 push-image:
 	docker push ${IMAGE}
+
+release: clean linux-amd64 darwin-amd64
+	#rm -f ${DIST}/sha256sums.txt
+	cd ${DIST} && sha256sum ./* > sha256sums.txt
+
+tag-release:
+	git tag v${VERSION}
