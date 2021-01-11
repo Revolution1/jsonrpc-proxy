@@ -133,13 +133,24 @@ func (i *CachedItem) IsRpcResult() bool {
 }
 
 func (i *CachedItem) GetRpcResponse(id interface{}) *RpcResponse {
-	r := &RpcResponse{rpcHeader: rpcHeader{Jsonrpc: JSONRPC2, Id: id}}
+	r := AcquireRpcResponse()
+	r.Id = id
 	if i.RpcError != nil {
 		r.Error = i.RpcError
 	} else if i.Result != nil {
 		r.Result = i.Result
 	}
 	return r
+}
+
+func (i *CachedItem) WriteToRpcResponse(r *RpcResponse, id interface{}) {
+	r.Jsonrpc = JSONRPC2
+	r.Id = id
+	if i.RpcError != nil {
+		r.Error = i.RpcError
+	} else if i.Result != nil {
+		r.Result = i.Result
+	}
 }
 
 type CachedItems []CachedItem

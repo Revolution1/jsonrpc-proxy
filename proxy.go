@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"github.com/fasthttp/router"
 	jsoniter "github.com/json-iterator/go"
@@ -88,118 +87,164 @@ func (p *Proxy) Serve() error {
 }
 
 func (p *Proxy) requestHandler(ctx *fasthttp.RequestCtx) {
+	var resps []RpcResponse
 	ctx.SetUserValue("isRpcReq", true)
 	reqBody := bytes.TrimSpace(ctx.Request.Body())
 	// length of minimum valid request '{"jsonrpc":"2.0","method":"1","id":1}'
 	if len(reqBody) < 37 {
-		setRpcErr(ctx, ErrRpcParseError, nil)
+		writeRpcErrResp(ctx, ErrRpcParseError, nil)
 		return
 	}
-	reqs, err := ParseRequest(reqBody)
-	if err != nil {
-		setRpcErr(ctx, err, nil)
+	reqs, rpcErr := ParseRequest(reqBody)
+	if rpcErr != nil {
+		writeRpcErrResp(ctx, rpcErr, nil)
 		return
 	}
-	setCtxRpcMethods(ctx, reqs)
-	//var isMonoReq bool
-	switch len(reqs) {
-	case 0:
-		setRpcErr(ctx, ErrRpcInvalidRequest, nil)
+	isMonoReq := reqBody[0] == '{' // && len(reqs) == 1
+	if len(reqs) == 0 {
+		writeRpcErrResp(ctx, ErrRpcInvalidRequest, nil)
 		return
-	case 1:
-		//isMonoReq = true
-		req := reqs[0]
+	}
+	methodNames := make([]string, len(reqs))
+	for i, r := range reqs {
+		methodNames[i] = r.Method
+	}
+	setCtxRpcMethods(ctx, methodNames)
+	cacheFor := time.Duration(0)
+	errFor := p.config.ErrFor.Duration
+	allCached := true
+	resps = make([]RpcResponse, len(reqs))
+	for idx, req := range reqs {
 		if !req.Validate() {
-			setRpcErr(ctx, ErrRpcInvalidRequest, req.Id)
-			return
+			if isMonoReq {
+				writeRpcErrResp(ctx, ErrRpcInvalidRequest, req.Id)
+				return
+			}
+			// if request is invalid, just set error
+			ErrRpcInvalidRequest.WriteToRpcResponse(&resps[idx], req.Id)
+			continue
 		}
-		// skip cache if is valid req&resp but no cache config set
-		cacheFor := time.Duration(0)
-		errFor := p.config.ErrFor.Duration
+		// skip cache if is valid req&upResp but no cache config set
 		cc := p.config.Search(req.Method)
-		if cc != nil {
+		if cc == nil {
+			allCached = false
+			RpcCacheMiss.WithLabelValues(req.Method).Inc()
+			break
+		}
+		// use the minimum non-zero cache duration
+		if cacheFor == 0 || cc.For.Duration < cacheFor {
 			cacheFor = cc.For.Duration
+		}
+		if errFor == 0 || cc.For.Duration < errFor {
 			errFor = cc.For.Duration
 		}
-		res := p.GetCachedItem(&req, cc)
+		res := p.GetCachedItem(req, cc)
+		if res == nil {
+			RpcCacheMiss.WithLabelValues(req.Method).Inc()
+			allCached = false
+			break
+		}
 		// found cached
-		if res != nil {
-			RpcCacheHit.WithLabelValues(req.Method).Inc()
-			switch {
-			case res.IsHttpResponse():
-				res.WriteHttpResponse(&ctx.Response)
-			case res.IsRpc():
+		RpcCacheHit.WithLabelValues(req.Method).Inc()
+		if res.IsHttpResponse() && isMonoReq { // cached http error or something
+			res.WriteHttpResponse(&ctx.Response)
+			return
+		} else if res.IsRpc() {
+			if isMonoReq {
 				resp := res.GetRpcResponse(req.Id)
-				data, err := jsoniter.Marshal(resp)
-				if err != nil {
-					log.WithError(err).Panic("fail to marshal response from cache")
-				}
-				if res.IsRpcError() {
-					setRpcErr(ctx, resp.Error, req.Id)
-				}
-				writeJsonResp(ctx, data)
-			default:
-				log.WithField("res", res).Panic("fail to process item from cache")
+				writeJsonResp(ctx, resp)
+				return
 			}
-			return
+			res.WriteToRpcResponse(&resps[idx], req.Id)
 		}
-		RpcCacheMiss.WithLabelValues(req.Method).Inc()
-		resp := fasthttp.AcquireResponse()
-		defer fasthttp.ReleaseResponse(resp)
-		setAcceptEncoding(ctx)
-		err := p.um.DoTimeout(&ctx.Request, resp, p.config.UpstreamRequestTimeout.Duration)
-		if err != nil {
-			log.WithError(err).WithField("req", req).Warn("error while requesting from upstream")
-			log.WithError(err).Tracef("error while requesting from upstream: \n%s", &ctx.Request)
-			e := ErrWithData(ErrRpcInternalError, err.Error())
-			p.SetCachedError(&req, e, errFor)
-			setRpcErr(ctx, e, req.Id)
-			return
-		}
-		respBody, err := getResponseBody(resp)
-		rpcResp := &RpcResponse{}
-		if resp.StatusCode() < 200 || resp.StatusCode() >= 400 || err != nil {
-			log.WithError(err).WithField("req", req).Warn("fail to decode response, simply forward to client")
-			log.Debug("decode error: ", err.Error())
-			log.Tracef("request:\n%s\n\nresponse:\n%s", &ctx.Request, resp)
-			p.SetCachedResponse(req, resp, errFor)
-			//resp.CopyTo(&ctx.Response)
-			p.forwardResponse(ctx, resp)
-			return
-		}
-		err = jsoniter.Unmarshal(respBody, rpcResp)
-		if err != nil {
-			err = json.Unmarshal(respBody, rpcResp)
-		}
-		if err != nil {
-			log.WithError(err).WithField("req", req).WithField("res", string(respBody)).Warn("fail to decode response to json, simply forward to client")
-			log.Debug("unmarshal error: ", err.Error())
-			log.Debugf("response: \n%s", resp)
-			p.SetCachedResponse(req, resp, errFor)
-			//resp.CopyTo(&ctx.Response)
-			p.forwardResponse(ctx, resp)
-			return
-		}
-		fasthttp.ReleaseResponse(resp)
-		if rpcResp.Error != nil {
-			log.WithField("rpcErr", rpcResp.Error).Tracef("rpc error while requesting from upstream: \n%s\n", ctx.Request.Body())
-			p.SetCachedError(&req, rpcResp.Error, errFor)
-			setRpcErr(ctx, rpcResp.Error, req.Id)
-			return
-		}
-		p.SetCachedRpcResponse(&req, rpcResp, cacheFor)
-		data, _ := jsoniter.Marshal(rpcResp)
-		writeJsonResp(ctx, data)
+	}
+	if allCached {
+		writeJsonResps(ctx, resps)
+		//for _, r := range resps {
+		//	ReleaseRpcResponse(r)
+		//}
+		resps = nil
 		return
-	default:
-		log.Panic("batch request not implemented yet")
+	}
+	// cache not found
+	upResp := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseResponse(upResp)
+	setAcceptEncoding(ctx)
+	err := p.um.DoTimeout(&ctx.Request, upResp, p.config.UpstreamRequestTimeout.Duration)
+	// network errors
+	if err != nil {
+		log.WithError(err).WithField("methods", methodNames).Warn("error while requesting from upstream")
+		log.WithError(err).Tracef("error while requesting from upstream: \n%s", &ctx.Request)
+		e := ErrWithData(ErrRpcInternalError, err.Error())
+		for idx, req := range reqs {
+			p.SetCachedError(req, e, errFor)
+			if isMonoReq {
+				writeRpcErrResp(ctx, e, req.Id)
+				return
+			}
+			e.WriteToRpcResponse(&resps[idx], req.Id)
+		}
+		writeJsonResps(ctx, resps)
+		ctx.SetStatusCode(StatusCodeOfRpcError(e))
+		return
+	}
+	upRespBody, err := getResponseBody(upResp)
+	// read body or decompression errors
+	if upResp.StatusCode() < 200 || upResp.StatusCode() >= 400 || err != nil {
+		log.WithError(err).WithField("methods", methodNames).Warn("fail to decode response, simply forward to client")
+		log.Debug("decode error: ", err.Error())
+		log.Tracef("request:\n%s\n\nresponse:\n%s", &ctx.Request, upResp)
+		if isMonoReq {
+			p.SetCachedResponse(reqs[0], upResp, errFor)
+		}
+		//upResp.CopyTo(&ctx.Response)
+		p.forwardResponse(ctx, upResp)
+		return
 	}
 
-	p.simpleForward(ctx)
-	log.Debug("end request")
+	if isMonoReq {
+		err = jsoniter.Unmarshal(upRespBody, &resps[0])
+	} else {
+		//for idx, _ := range reqs {
+		//	resps[idx] = AcquireRpcResponse()
+		//}
+		//resps = []RpcResponse{}
+		err = jsoniter.Unmarshal(upRespBody, &resps)
+	}
+
+	// json unmarshal errors
+	if err != nil {
+		log.WithError(err).WithField("methods", methodNames).WithField("res", string(upRespBody)).Warn("fail to decode response to json, simply forward to client")
+		log.Debug("unmarshal error: ", err.Error())
+		log.Debugf("response: \n%s", upResp)
+		if isMonoReq {
+			p.SetCachedResponse(reqs[0], upResp, errFor)
+		} //upResp.CopyTo(&ctx.Response)
+		p.forwardResponse(ctx, upResp)
+		return
+	}
+	fasthttp.ReleaseResponse(upResp)
+	for idx, resp := range resps {
+		// jsonrpc errors
+		if resp.Error != nil {
+			if !resp.Error.Is(ErrRpcInvalidRequest) {
+				log.WithField("rpcErr", resp.Error).Tracef("rpc error while requesting from upstream: \n%s\n", reqs[idx])
+				p.SetCachedError(reqs[idx], resp.Error, errFor)
+			}
+			continue
+		}
+		// no error, cache responses
+		p.SetCachedRpcResponse(reqs[idx], &resp, cacheFor)
+	}
+
+	if isMonoReq {
+		writeJsonResp(ctx, &resps[0])
+	} else {
+		writeJsonResps(ctx, resps)
+	}
 }
 
-func (p *Proxy) SetCachedHttpError(req RpcRequest, code int, message []byte, errFor time.Duration) {
+func (p *Proxy) SetCachedHttpError(req *RpcRequest, code int, message []byte, errFor time.Duration) {
 	key, err := req.ToCacheKey()
 	if err != nil {
 		return
@@ -210,7 +255,7 @@ func (p *Proxy) SetCachedHttpError(req RpcRequest, code int, message []byte, err
 	}
 }
 
-func (p *Proxy) SetCachedResponse(req RpcRequest, resp *fasthttp.Response, errFor time.Duration) {
+func (p *Proxy) SetCachedResponse(req *RpcRequest, resp *fasthttp.Response, errFor time.Duration) {
 	key, err := req.ToCacheKey()
 	if err != nil {
 		return
@@ -282,11 +327,11 @@ func (p *Proxy) forwardResponse(ctx *fasthttp.RequestCtx, response *fasthttp.Res
 	_ = response.BodyWriteTo(ctx)
 }
 
-func setRpcErr(ctx *fasthttp.RequestCtx, rpcError *RpcError, id interface{}) {
+func writeRpcErrResp(ctx *fasthttp.RequestCtx, rpcError *RpcError, id interface{}) {
 	ctx.ResetBody()
 	ctx.SetUserValue("rpcErr", rpcError)
 	ctx.SetBodyString(rpcError.JsonError(id))
-	ctx.SetStatusCode(200)
+	ctx.SetStatusCode(StatusCodeOfRpcError(rpcError))
 	ctx.SetContentType("application/json; charset=utf-8")
 }
 
@@ -303,21 +348,43 @@ func getCtxRpcMethods(ctx *fasthttp.RequestCtx) []string {
 	return nil
 }
 
-func setCtxRpcMethods(ctx *fasthttp.RequestCtx, reqs []RpcRequest) {
-	methods := make([]string, len(reqs))
-	for i, r := range reqs {
-		methods[i] = r.Method
-	}
-	ctx.SetUserValue("rpcMethods", methods)
+func setCtxRpcMethods(ctx *fasthttp.RequestCtx, methodNames []string) {
+	ctx.SetUserValue("rpcMethods", methodNames)
 }
 
-func writeJsonResp(ctx *fasthttp.RequestCtx, body []byte) {
+func writeJsonResp(ctx *fasthttp.RequestCtx, resp *RpcResponse) {
+	data, err := jsoniter.Marshal(resp)
+	if err != nil {
+		log.WithError(err).Panic("fail to marshal response from cache")
+	}
+	writeJsonRespRaw(ctx, data, StatusCodeOfRpcError(resp.Error))
+	if resp.Error != nil {
+		ctx.SetUserValue("rpcErr", resp.Error)
+	}
+}
+
+func writeJsonResps(ctx *fasthttp.RequestCtx, resps []RpcResponse) {
+	data, err := jsoniter.Marshal(resps)
+	if err != nil {
+		log.WithError(err).Panic("fail to marshal response from cache")
+	}
+	status := 500
+	for _, r := range resps {
+		c := StatusCodeOfRpcError(r.Error)
+		if c < status {
+			status = c
+		}
+	}
+	writeJsonRespRaw(ctx, data, status)
+}
+
+func writeJsonRespRaw(ctx *fasthttp.RequestCtx, body []byte, code int) {
 	ctx.Response.SetBody(body)
 	if ctx.Request.Header.ConnectionClose() {
 		ctx.Response.SetConnectionClose()
 	}
 	ctx.SetContentType("application/json; charset=utf-8")
-	ctx.SetStatusCode(fasthttp.StatusOK)
+	ctx.SetStatusCode(code)
 }
 
 const (

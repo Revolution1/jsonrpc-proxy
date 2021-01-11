@@ -23,3 +23,19 @@ path match:
             \_ jsonrpc error: cache errored request for it's 'ErrFor' duration
             \_ success: cache for it's 'for' duration and return
 ```
+
+# TODO
+
+- [x] batch request
+- [ ] cache notfound error
+- [ ] easyjson & msgp
+- [ ] method statistics
+- [ ] account based rate limiting
+- [ ] epoch based retry & loadbalancing
+- [ ] modularize
+
+
+# ref
+
+https://www.jsonrpc.org/historical/json-rpc-over-http.html
+
