@@ -20,7 +20,7 @@ const JSONRPC2 = "2.0"
 var jsonSorted = jsoniter.Config{SortMapKeys: true, EscapeHTML: true}.Froze()
 
 type rpcHeader struct {
-	Jsonrpc string      `json:"jsonrpc"`
+	Jsonrpc string      `json:"jsonrpc,intern"`
 	Id      interface{} `json:"id,omitempty"`
 }
 

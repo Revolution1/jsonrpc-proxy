@@ -28,11 +28,11 @@ path match:
 
 - [x] batch request
 - [ ] cache notfound error
-- [ ] easyjson & msgp
 - [ ] method statistics
 - [ ] account based rate limiting
 - [ ] epoch based retry & loadbalancing
 - [ ] modularize
+- [ ] easyjson & msgp
 
 
 # ref

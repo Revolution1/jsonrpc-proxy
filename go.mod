@@ -13,6 +13,7 @@ require (
 	github.com/google/gops v0.3.14
 	github.com/json-iterator/go v1.1.10
 	github.com/klauspost/compress v1.11.3 // indirect
+	github.com/mailru/easyjson v0.7.6
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.8.0
 	github.com/prometheus/common v0.15.0 // indirect

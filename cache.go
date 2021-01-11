@@ -18,7 +18,7 @@ type BigCacheTTL struct {
 	*bigcache.BigCache
 }
 
-func NewBigCacheTTL(maxTTL, cleanWindow time.Duration) *BigCacheTTL {
+func NewBigCacheTTL(maxTTL, cleanWindow time.Duration, maxSizeMb int) *BigCacheTTL {
 	c, err := bigcache.NewBigCache(bigcache.Config{
 		Shards:             1024,
 		LifeWindow:         maxTTL,
@@ -27,7 +27,7 @@ func NewBigCacheTTL(maxTTL, cleanWindow time.Duration) *BigCacheTTL {
 		MaxEntrySize:       500,
 		Verbose:            true,
 		Hasher:             fnv64a{},
-		HardMaxCacheSize:   0,
+		HardMaxCacheSize:   maxSizeMb,
 		Logger:             log.StandardLogger(),
 	})
 	if err != nil {

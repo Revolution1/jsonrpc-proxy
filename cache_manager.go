@@ -17,9 +17,9 @@ type CacheManager struct {
 
 func NewCacheManager() *CacheManager {
 	return &CacheManager{
-		cache1m:    NewBigCacheTTL(time.Minute, 30*time.Second),
-		cache1h:    NewBigCacheTTL(time.Hour, time.Minute),
-		cacheSolid: NewBigCacheTTL(0, 0),
+		cache1m:    NewBigCacheTTL(time.Minute, 30*time.Second, 64),
+		cache1h:    NewBigCacheTTL(time.Hour, time.Minute, 128),
+		cacheSolid: NewBigCacheTTL(0, 0, 256),
 	}
 }
 
