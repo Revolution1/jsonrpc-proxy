@@ -1,3 +1,19 @@
+package types
+
+import (
+	assertion "github.com/stretchr/testify/assert"
+	"sigs.k8s.io/yaml"
+	"testing"
+)
+
+func TestLoadConfig(t *testing.T) {
+	assert := assertion.New(t)
+	conf := &Config{}
+	err := yaml.Unmarshal([]byte(v1Example), conf)
+	assert.NoError(err)
+}
+
+const v1Example = `
 version: 1.0
 
 listeners:
@@ -135,3 +151,4 @@ processors:
         - GetNetworkId
         for: 1h
         errFor: 1s
+`

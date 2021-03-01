@@ -33,7 +33,8 @@ path match:
 - [ ] epoch based retry & loadbalancing
 - [ ] modularize
 - [ ] easyjson & msgp
-
+- [ ] consider https://dgraph.io/blog/post/introducing-ristretto-high-perf-go-cache/
+- [ ] replace logrus with zerolog
 
 # ref
 

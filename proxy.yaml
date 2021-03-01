@@ -55,11 +55,7 @@ cacheConfigs:
   - GetPendingTxn
   - GetPendingTxns
   - GetRecentTransactions
-  for: 5s
-  errFor: 1s
-
-# fast changing and with param
-- methods:
+  # fast changing and with param
   - DSBlockListing
   - TxBlockListing
   - GetDsBlock
