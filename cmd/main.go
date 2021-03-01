@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"github.com/fasthttp/router"
 	"github.com/google/gops/agent"
-	"github.com/revolution1/jsonrpc-proxy/oldconfig"
 	"github.com/revolution1/jsonrpc-proxy/manage"
 	"github.com/revolution1/jsonrpc-proxy/middleware"
+	"github.com/revolution1/jsonrpc-proxy/oldconfig"
+	"github.com/revolution1/jsonrpc-proxy/types"
 	"github.com/revolution1/jsonrpc-proxy/proxy"
 	"github.com/revolution1/jsonrpc-proxy/utils"
 	log "github.com/sirupsen/logrus"
@@ -45,11 +46,11 @@ func main() {
 		}
 		log.Infof("Loading config from %s", *path)
 		log.Infof("Version: %s", printVersion())
-		conf, err := oldconfig.LoadConfig(*path)
+		conf, err := types.
 		if err != nil {
 			return err
 		}
-		conf.MustValidate()
+		//conf.MustValidate()
 		initLog(conf)
 		return runMain(conf)
 	}
