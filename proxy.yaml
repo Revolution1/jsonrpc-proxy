@@ -33,8 +33,8 @@ listen: 0.0.0.0:8080
 path: /
 
 cacheConfigs:
-# changing fast and no param
 - methods:
+  # no param
   - GetBlockchainInfo
   - GetCurrentDSEpoch
   - GetCurrentMiniEpoch
@@ -55,11 +55,7 @@ cacheConfigs:
   - GetPendingTxn
   - GetPendingTxns
   - GetRecentTransactions
-  for: 5s
-  errFor: 1s
-
-# fast changing and with param
-- methods:
+  # with param
   - DSBlockListing
   - TxBlockListing
   - GetDsBlock
