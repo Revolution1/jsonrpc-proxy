@@ -1,5 +1,34 @@
 # jsonrpc-proxy ![Build and Release](https://github.com/Revolution1/jsonrpc-proxy/workflows/Build%20and%20Release/badge.svg)
 
+# Quick Start
+
+### Install
+
+```shell
+go install github.com/revolution1/jsonrpc-proxy
+
+#or
+
+curl -L https://github.com/Revolution1/jsonrpc-proxy/releases/latest/download/jsonrpc-proxy-Darwin-amd64 -o jsonrpc-proxy
+chmod +x jsonrpc-proxy
+```
+
+### Edit Config and Run
+
+Download config file from https://github.com/Revolution1/jsonrpc-proxy/raw/main/proxy.yaml
+
+Run
+
+```shell
+jsonrpc-proxy -c proxy.yaml
+```
+
+### Test
+
+```shell
+$ curl http://loclahost:8080 -X POST -d '{"id":1,"jsonrpc":"2.0","method":"GetBlockchainInfo","params":[]}'
+```
+
 ## Request Processing & Caching Policy
 
 ```text
@@ -27,6 +56,7 @@ path match:
 # TODO
 
 - [x] batch request
+- [ ] k8s service discovery
 - [ ] cache notfound error
 - [ ] method statistics
 - [ ] account based rate limiting
