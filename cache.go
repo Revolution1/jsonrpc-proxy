@@ -20,7 +20,7 @@ type BigCacheTTL struct {
 
 func NewBigCacheTTL(maxTTL, cleanWindow time.Duration, maxSizeMb int) *BigCacheTTL {
 	c, err := bigcache.NewBigCache(bigcache.Config{
-		Shards:             1024,
+		Shards:             calcShards(maxSizeMb),
 		LifeWindow:         maxTTL,
 		CleanWindow:        cleanWindow,
 		MaxEntriesInWindow: 1000 * 10 * 60,
@@ -70,3 +70,11 @@ func (c *BigCacheTTL) Clear() error {
 }
 
 func (c *BigCacheTTL) Iterator() {}
+
+func calcShards(maxMb int) int {
+	n := maxMb * 1024 / 256
+	if n > 1024 {
+		return 1024
+	}
+	return n
+}

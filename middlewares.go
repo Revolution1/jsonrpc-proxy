@@ -6,6 +6,7 @@ import (
 	"github.com/AdhityaRamadhanus/fasthttpcors"
 	realip "github.com/Ferluci/fast-realip"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/revolution1/jsonrpc-proxy/jsonrpc"
 	"github.com/savsgio/gotils"
 	log "github.com/sirupsen/logrus"
 	"github.com/valyala/fasthttp"
@@ -69,7 +70,7 @@ func accessLogMetricHandler(prefix string, config *Config) MiddleWare {
 				if status != 200 {
 					errStr = fmt.Sprintf("%d(%s)", status, fasthttp.StatusMessage(status))
 				}
-				if err, ok := ctx.UserValue("rpcErr").(*RpcError); ok {
+				if err, ok := ctx.UserValue("rpcErr").(*jsonrpc.RpcError); ok {
 					errStr = err.AccessLogError()
 					rpcErrCode = err.Code
 				} else if err, ok := ctx.UserValue("rpcErr").(error); ok {

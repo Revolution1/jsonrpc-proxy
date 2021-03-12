@@ -1,5 +1,5 @@
 // ref: https://www.jsonrpc.org/specification
-package main
+package jsonrpc
 
 import (
 	"bytes"
@@ -19,12 +19,12 @@ const JSONRPC2 = "2.0"
 
 var jsonSorted = jsoniter.Config{SortMapKeys: true, EscapeHTML: true}.Froze()
 
-type rpcHeader struct {
+type RpcHeader struct {
 	Jsonrpc string      `json:"jsonrpc,intern"`
 	Id      interface{} `json:"id,omitempty"`
 }
 
-func (h rpcHeader) Validate() bool {
+func (h RpcHeader) Validate() bool {
 	switch h.Id.(type) {
 	case string, float64, types.Nil:
 		return h.Jsonrpc == JSONRPC2
@@ -33,17 +33,17 @@ func (h rpcHeader) Validate() bool {
 }
 
 type RpcRequest struct {
-	rpcHeader
+	RpcHeader
 	Method string      `json:"method"`
 	Params interface{} `json:"params,omitempty"`
 }
 
 func NewRpcRequest(id int, method string, params interface{}) *RpcRequest {
-	return &RpcRequest{rpcHeader: rpcHeader{JSONRPC2, id}, Method: method, Params: params}
+	return &RpcRequest{RpcHeader: RpcHeader{JSONRPC2, id}, Method: method, Params: params}
 }
 
 func (r RpcRequest) Validate() bool {
-	return r.rpcHeader.Validate() && r.Method != ""
+	return r.RpcHeader.Validate() && r.Method != ""
 }
 
 func (r RpcRequest) String() string {
@@ -59,13 +59,13 @@ func (r RpcRequest) ToCacheKey() (string, error) {
 }
 
 func (r *RpcRequest) Reset() {
-	r.rpcHeader.Id = nil
+	r.RpcHeader.Id = nil
 	r.Method = ""
 	r.Params = nil
 }
 
 type RpcResponse struct {
-	rpcHeader
+	RpcHeader
 	Error  *RpcError   `json:"error,omitempty"`
 	Result interface{} `json:"result,omitempty"`
 }
@@ -75,7 +75,7 @@ func (r RpcResponse) Success() bool {
 }
 
 func (r *RpcResponse) Reset() {
-	r.rpcHeader.Id = nil
+	r.RpcHeader.Id = nil
 	r.Error = nil
 	r.Result = nil
 }
@@ -107,7 +107,7 @@ type RpcRequests []*RpcRequest
 //
 //func (rs RpcRequests) Validate() bool {
 //	for _,r:=range rs {
-//	  return rs.rpcHeader.Validate() && r.Method != ""
+//	  return rs.RpcHeader.Validate() && r.Method != ""
 //	}
 //}
 //
@@ -122,7 +122,7 @@ type RpcRequests []*RpcRequest
 func AcquireRpcRequest() *RpcRequest {
 	r := rpcReqPool.Get()
 	if r == nil {
-		return &RpcRequest{rpcHeader: rpcHeader{Jsonrpc: JSONRPC2}}
+		return &RpcRequest{RpcHeader: RpcHeader{Jsonrpc: JSONRPC2}}
 	}
 	return r.(*RpcRequest)
 }
@@ -135,7 +135,7 @@ func ReleaseRpcRequest(r *RpcRequest) {
 func AcquireRpcResponse() *RpcResponse {
 	r := rpcReqPool.Get()
 	if r == nil {
-		return &RpcResponse{rpcHeader: rpcHeader{Jsonrpc: JSONRPC2}}
+		return &RpcResponse{RpcHeader: RpcHeader{Jsonrpc: JSONRPC2}}
 	}
 	return r.(*RpcResponse)
 }

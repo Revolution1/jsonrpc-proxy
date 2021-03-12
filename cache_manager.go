@@ -2,6 +2,7 @@ package main
 
 import (
 	jsoniter "github.com/json-iterator/go"
+	"github.com/revolution1/jsonrpc-proxy/jsonrpc"
 	"github.com/savsgio/gotils"
 	log "github.com/sirupsen/logrus"
 	"github.com/valyala/fasthttp"
@@ -17,9 +18,9 @@ type CacheManager struct {
 
 func NewCacheManager() *CacheManager {
 	return &CacheManager{
-		cache1m:    NewBigCacheTTL(time.Minute, 30*time.Second, 64),
-		cache1h:    NewBigCacheTTL(time.Hour, time.Minute, 128),
-		cacheSolid: NewBigCacheTTL(0, 0, 256),
+		cache1m:    NewBigCacheTTL(time.Minute, 50*time.Second, 1024),
+		cache1h:    NewBigCacheTTL(time.Hour, time.Minute, 512),
+		cacheSolid: NewBigCacheTTL(0, 0, 512),
 	}
 }
 
@@ -85,7 +86,7 @@ type CachedHttpResp struct {
 }
 
 type CachedItem struct {
-	RpcError     *RpcError           `json:"e,omitempty"`
+	RpcError     *jsonrpc.RpcError   `json:"e,omitempty"`
 	Result       jsoniter.RawMessage `json:"r,omitempty"`
 	HttpResponse *CachedHttpResp     `json:"h,omitempty"`
 }
@@ -113,7 +114,7 @@ func (i *CachedItem) IsRpcError() bool {
 	return i.RpcError != nil
 }
 
-func (i *CachedItem) GetRpcError() *RpcError {
+func (i *CachedItem) GetRpcError() *jsonrpc.RpcError {
 	return i.RpcError
 }
 
@@ -132,8 +133,8 @@ func (i *CachedItem) IsRpcResult() bool {
 	return i.Result != nil
 }
 
-func (i *CachedItem) GetRpcResponse(id interface{}) *RpcResponse {
-	r := AcquireRpcResponse()
+func (i *CachedItem) GetRpcResponse(id interface{}) *jsonrpc.RpcResponse {
+	r := jsonrpc.AcquireRpcResponse()
 	r.Id = id
 	if i.RpcError != nil {
 		r.Error = i.RpcError
@@ -143,8 +144,8 @@ func (i *CachedItem) GetRpcResponse(id interface{}) *RpcResponse {
 	return r
 }
 
-func (i *CachedItem) WriteToRpcResponse(r *RpcResponse, id interface{}) {
-	r.Jsonrpc = JSONRPC2
+func (i *CachedItem) WriteToRpcResponse(r *jsonrpc.RpcResponse, id interface{}) {
+	r.Jsonrpc = jsonrpc.JSONRPC2
 	r.Id = id
 	if i.RpcError != nil {
 		r.Error = i.RpcError

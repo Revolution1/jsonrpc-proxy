@@ -1,4 +1,4 @@
-package main
+package jsonrpc
 
 import (
 	jsoniter "github.com/json-iterator/go"

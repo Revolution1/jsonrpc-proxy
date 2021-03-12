@@ -13,6 +13,9 @@ manage:
   path: /manage
   metricsPath: /metrics
 
+statistic:
+  enabled: false
+
 upstreams:
 - https://dev-api.zilliqa.com
 # keepAlive: false
@@ -20,13 +23,10 @@ upstreamRequestTimeout: 10s
 # cache errors globally, for requests like "unknown method"
 errFor: 1s
 
-#k8s_sd:
-#  scheme: http
-#  port: 4201
-#  namespace: default
-#  labelSelector:
-#    app: zilliqa
-#    type: level2lookup
+k8sServiceDiscovery:
+  namespace: default
+  name: l2api
+  port: 4201
 
 # scheme=http ip=0.0.0.0 port=8080
 listen: 0.0.0.0:8080

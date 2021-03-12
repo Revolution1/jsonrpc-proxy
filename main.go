@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/fasthttp/router"
 	"github.com/google/gops/agent"
+	"github.com/revolution1/jsonrpc-proxy/statistic"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/valyala/fasthttp"
@@ -66,6 +67,11 @@ func runMain(config *Config) error {
 
 	serverListen := GetHostFromUrl(config.Listen)
 	manageListen := GetHostFromUrl(config.Manage.Listen)
+
+	if config.Statistic.Enabled {
+		log.Info("initialize statistic collecting")
+		statistic.InitStatistic(debugMode)
+	}
 
 	var manageServer *fasthttp.Server
 	m := NewManage(config, p)

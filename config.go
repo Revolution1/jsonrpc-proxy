@@ -12,21 +12,23 @@ import (
 )
 
 type Config struct {
-	LogLevel               string        `json:"logLevel"`
-	LogForceColors         bool          `json:"logForceColors"`
-	Debug                  bool          `json:"debug"`
-	AccessLog              bool          `json:"accessLog"`
-	Manage                 ManageConfig  `json:"manage"`
-	Upstreams              []string      `json:"upstreams"`
-	Listen                 string        `json:"listen"`
-	Path                   string        `json:"path"`
-	KeepAlive              string        `json:"keepAlive"`
-	UpstreamRequestTimeout Duration      `json:"upstreamRequestTimeout"`
-	ReadTimeout            Duration      `json:"readTimeout"`
-	WriteTimeout           Duration      `json:"writeTimeout"`
-	IdleTimeout            Duration      `json:"idleTimeout"`
-	ErrFor                 Duration      `json:"errFor"`
-	CacheConfigs           []CacheConfig `json:"cacheConfigs"`
+	LogLevel               string           `json:"logLevel"`
+	LogForceColors         bool             `json:"logForceColors"`
+	Debug                  bool             `json:"debug"`
+	AccessLog              bool             `json:"accessLog"`
+	Manage                 *ManageConfig    `json:"manage"`
+	Statistic              *StatisticConfig `json:"statistic"`
+	Upstreams              []string         `json:"upstreams"`
+	K8sServiceDiscovery    *K8sSDConfig     `json:"k8sServiceDiscovery"`
+	Listen                 string           `json:"listen"`
+	Path                   string           `json:"path"`
+	KeepAlive              string           `json:"keepAlive"`
+	UpstreamRequestTimeout Duration         `json:"upstreamRequestTimeout"`
+	ReadTimeout            Duration         `json:"readTimeout"`
+	WriteTimeout           Duration         `json:"writeTimeout"`
+	IdleTimeout            Duration         `json:"idleTimeout"`
+	ErrFor                 Duration         `json:"errFor"`
+	CacheConfigs           []*CacheConfig   `json:"cacheConfigs"`
 }
 
 type ManageConfig struct {
@@ -43,6 +45,16 @@ type CacheConfig struct {
 
 func (cc *CacheConfig) Sort() {
 	sort.Strings(cc.Methods)
+}
+
+type K8sSDConfig struct {
+	Namespace string `json:"namespace"`
+	Name      string `json:"name"`
+	Port      int    `json:"port"`
+}
+
+type StatisticConfig struct {
+	Enabled bool `json:"enabled"`
 }
 
 func LoadConfig(path string) (conf *Config, err error) {
@@ -62,7 +74,7 @@ func (c *Config) Search(method string) *CacheConfig {
 	for _, cc := range c.CacheConfigs {
 		i := sort.SearchStrings(cc.Methods, method)
 		if i < len(cc.Methods) && cc.Methods[i] == method {
-			return &cc
+			return cc
 		}
 	}
 	return nil

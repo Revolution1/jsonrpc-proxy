@@ -26,5 +26,7 @@ require (
 	golang.org/x/sys v0.0.0-20201211090839-8ad439b19e0f // indirect
 	google.golang.org/protobuf v1.25.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
+	gorm.io/driver/sqlite v1.1.4
+	gorm.io/gorm v1.20.12
 	sigs.k8s.io/yaml v1.2.0
 )
