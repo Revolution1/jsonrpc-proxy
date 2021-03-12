@@ -5,7 +5,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-var version = "0.0.3"
+var version = "0.0.4"
 
 var (
 	commit    = ""
